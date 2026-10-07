@@ -2,7 +2,6 @@
 %% Canonical Prolog Quantum Intermediate Representation.
 
 :- module(quantum_ir, [
-    circuit/3,
     make_circuit/4,
     circuit_qubits/2,
     circuit_cbits/2,
