@@ -29,6 +29,9 @@
 ]).
 
 :- use_module(quantum_complex).
+:- use_module(library(apply)).
+:- use_module(library(lists)).
+:- use_module(library(yall)).
 
 %% matrix_dims(+Matrix, ?Rows, ?Cols)
 matrix_dims(Matrix, Rows, Cols) :-
@@ -55,12 +58,14 @@ matrix_mul(A, B, C) :-
     matrix_dims(B, RB, CB),
     CA =:= RB,
     matrix_transpose(B, BT),
-    numlist(0, RA-1, RowIdxs),
+    LastRow is RA - 1,
+    numlist(0, LastRow, RowIdxs),
     maplist(mul_row(A, BT, CB), RowIdxs, C).
 
 mul_row(A, BT, CB, RI, Row) :-
     nth0(RI, A, ARow),
-    numlist(0, CB-1, ColIdxs),
+    LastCol is CB - 1,
+    numlist(0, LastCol, ColIdxs),
     maplist(dot_product(ARow, BT), ColIdxs, Row).
 
 dot_product(ARow, BT, CI, Val) :-
@@ -74,7 +79,7 @@ matrix_add(A, B, C) :-
 
 %% matrix_scalar_mul(+S, +M, ?R)
 matrix_scalar_mul(S, M, R) :-
-    maplist([Row, RRow]>>(maplist([E, RE]>>(complex_mul(S, E, RE)), Row, RRow)), M, R).
+    maplist({S}/[Row, RRow]>>(maplist([E, RE]>>(complex_mul(S, E, RE)), Row, RRow)), M, R).
 
 %% matrix_transpose(+M, ?T)
 matrix_transpose([], []).
@@ -91,10 +96,11 @@ matrix_conj_transpose(M, CT) :-
 
 %% matrix_identity(+N, ?I)
 matrix_identity(N, I) :-
-    numlist(0, N-1, Idxs),
-    maplist([RI, Row]>>(
-        numlist(0, N-1, CIdxs),
-        maplist([CI, E]>>(
+    Last is N - 1,
+    numlist(0, Last, Idxs),
+    maplist({Last}/[RI, Row]>>(
+        numlist(0, Last, CIdxs),
+        maplist({RI}/[CI, E]>>(
             ( RI =:= CI -> E = c(1,0) ; E = c(0,0) )
         ), CIdxs, Row)
     ), Idxs, I).
@@ -114,7 +120,8 @@ matrix_tensor(A, B, T) :-
     matrix_dims(B, RB, CB),
     RowsT is RA * RB,
     ColsT is CA * CB,
-    numlist(0, RowsT-1, RowIdxs),
+    LastRow is RowsT - 1,
+    numlist(0, LastRow, RowIdxs),
     maplist(tensor_row(A, B, RB, CB), RowIdxs, T).
 
 tensor_row(A, B, RB, CB, RI, Row) :-
@@ -122,7 +129,8 @@ tensor_row(A, B, RB, CB, RI, Row) :-
     BIR is RI mod RB,
     matrix_dims(A, _, CA),
     ColsT is CA * CB,
-    numlist(0, ColsT-1, ColIdxs),
+    LastCol is ColsT - 1,
+    numlist(0, LastCol, ColIdxs),
     maplist(tensor_elem(A, B, AIR, BIR, CB), ColIdxs, Row).
 
 tensor_elem(A, B, AIR, BIR, CB, CI, Val) :-
@@ -135,7 +143,8 @@ tensor_elem(A, B, AIR, BIR, CB, CI, Val) :-
 %% matrix_trace(+M, ?T)
 matrix_trace(M, T) :-
     matrix_dims(M, N, N),
-    numlist(0, N-1, Idxs),
+    Last is N - 1,
+    numlist(0, Last, Idxs),
     maplist([I, E]>>(matrix_get(M, I, I, E)), Idxs, Diag),
     foldl([E, Acc, NAcc]>>(complex_add(E, Acc, NAcc)), Diag, c(0,0), T).
 
@@ -154,14 +163,14 @@ matrix_is_hermitian(M, Tol) :-
 
 %% matrix_equal(+A, +B, +Tol)
 matrix_equal(A, B, Tol) :-
-    maplist([RA, RB]>>(
-        maplist([E1, E2]>>(complex_equal(E1, E2, Tol)), RA, RB)
+    maplist({Tol}/[RA, RB]>>(
+        maplist({Tol}/[E1, E2]>>(complex_equal(E1, E2, Tol)), RA, RB)
     ), A, B).
 
 %% matrix_apply(+M, +Vec, ?Out)  Vec and Out are column vectors as lists
 matrix_apply(M, Vec, Out) :-
-    maplist([Row, Val]>>(
-        maplist([E, V, P]>>(complex_mul(E, V, P)), Row, Vec, Prods),
+    maplist({Vec}/[Row, Val]>>(
+        maplist({Vec}/[E, V, P]>>(complex_mul(E, V, P)), Row, Vec, Prods),
         foldl([P, Acc, NAcc]>>(complex_add(P, Acc, NAcc)), Prods, c(0,0), Val)
     ), M, Out).
 
@@ -178,7 +187,7 @@ inner_product(V1, V2, IP) :-
 %% outer_product(+V1, +V2, ?M):  |V1><V2|
 outer_product(V1, V2, M) :-
     maplist([A, Row]>>(
-        maplist([B, E]>>(complex_conj(B, CB), complex_mul(A, CB, E)), V2, Row)
+        maplist({A}/[B, E]>>(complex_conj(B, CB), complex_mul(A, CB, E)), V2, Row)
     ), V1, M).
 
 %% vector_norm(+V, ?N)
@@ -191,4 +200,4 @@ vector_norm(V, N) :-
 vector_normalise(V, NV) :-
     vector_norm(V, N),
     N > 0,
-    maplist([E, NE]>>(complex_div(E, c(N,0), NE)), V, NV).
+    maplist({N}/[E, NE]>>(complex_div(E, c(N,0), NE)), V, NV).

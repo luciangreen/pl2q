@@ -27,14 +27,18 @@
 :- use_module(quantum_complex).
 :- use_module(quantum_matrix).
 :- use_module(quantum_tensor).
+:- use_module(library(apply)).
+:- use_module(library(lists)).
+:- use_module(library(yall)).
 
 %% basis_state(+N, ?V): N-qubit computational basis |0...0>
 basis_state(N, V) :-
     Dim is 2^N,
     length(V, Dim),
     nth0(0, V, c(1,0)),
-    numlist(1, Dim-1, Idxs),
-    maplist([I]>>(nth0(I, V, c(0,0))), Idxs).
+    Last is Dim - 1,
+    numlist(1, Last, Idxs),
+    maplist({V}/[I]>>(nth0(I, V, c(0,0))), Idxs).
 
 %% ket(+Label, ?V): named ket state
 ket(0, [c(1,0), c(0,0)]).
@@ -102,8 +106,9 @@ zero_state(N, S) :-
     Dim is 2^N,
     length(S, Dim),
     nth0(0, S, c(1,0)),
-    numlist(1, Dim-1, Idxs),
-    maplist([I]>>(nth0(I, S, c(0,0))), Idxs).
+    Last is Dim - 1,
+    numlist(1, Last, Idxs),
+    maplist({S}/[I]>>(nth0(I, S, c(0,0))), Idxs).
 
 %% Single-qubit standard states
 plus_state([c(H, 0), c(H, 0)]) :- H is 1/sqrt(2).
@@ -123,5 +128,6 @@ ghz_state(N, S) :-
     Last is Dim - 1,
     nth0(0, S, c(H,0)),
     nth0(Last, S, c(H,0)),
-    numlist(1, Last-1, MiddleIdxs),
-    maplist([I]>>(nth0(I, S, c(0,0))), MiddleIdxs).
+    BeforeLast is Last - 1,
+    numlist(1, BeforeLast, MiddleIdxs),
+    maplist({S}/[I]>>(nth0(I, S, c(0,0))), MiddleIdxs).

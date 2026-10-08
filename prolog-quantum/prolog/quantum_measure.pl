@@ -4,24 +4,29 @@
 :- module(quantum_measure, [
     measure_statevector/4,
     measure_all/2,
-    measurement_probabilities/3,
-    post_measurement_state/4,
+    measurement_probabilities/4,
+    post_measurement_state/5,
     measure_qubit/4,
     shot_sample/3
 ]).
 
 :- use_module(quantum_complex).
 :- use_module(quantum_state).
+:- use_module(library(apply)).
+:- use_module(library(lists)).
+:- use_module(library(random)).
+:- use_module(library(yall)).
 
 %% measure_statevector(+State, +QubitIdx, +N, ?Results)
 %% Results: list of (outcome(0 or 1), probability, post_state)
 measure_statevector(State, QIdx, N, Results) :-
     length(State, Dim),
     Dim =:= 2^N,
-    numlist(0, Dim-1, Idxs),
+    Last is Dim - 1,
+    numlist(0, Last, Idxs),
     %% Probability of outcome 0
-    include([I]>>( B is (I >> (N - QIdx - 1)) /\ 1, B =:= 0 ), Idxs, Idxs0),
-    include([I]>>( B is (I >> (N - QIdx - 1)) /\ 1, B =:= 1 ), Idxs, Idxs1),
+    include({N,QIdx}/[I]>>( B is (I >> (N - QIdx - 1)) /\ 1, B =:= 0 ), Idxs, Idxs0),
+    include({N,QIdx}/[I]>>( B is (I >> (N - QIdx - 1)) /\ 1, B =:= 1 ), Idxs, Idxs1),
     sum_probs(State, Idxs0, P0),
     sum_probs(State, Idxs1, P1),
     post_collapse(State, Idxs0, P0, Post0),
@@ -29,13 +34,14 @@ measure_statevector(State, QIdx, N, Results) :-
     Results = [outcome(0, P0, Post0), outcome(1, P1, Post1)].
 
 sum_probs(State, Idxs, P) :-
-    maplist([I, Prob]>>(nth0(I, State, Amp), complex_abs_sq(Amp, Prob)), Idxs, Probs),
-    sumlist(Probs, P).
+    maplist({State}/[I, Prob]>>(nth0(I, State, Amp), complex_abs_sq(Amp, Prob)), Idxs, Probs),
+    sum_list(Probs, P).
 
 post_collapse(State, KeepIdxs, Prob, Post) :-
     length(State, Dim),
-    numlist(0, Dim-1, AllIdxs),
-    maplist([I, E]>>(
+    Last is Dim - 1,
+    numlist(0, Last, AllIdxs),
+    maplist({State,KeepIdxs,Prob}/[I, E]>>(
         ( member(I, KeepIdxs), Prob > 0
         -> nth0(I, State, Amp),
            NormFactor is 1/sqrt(Prob),
@@ -48,8 +54,9 @@ post_collapse(State, KeepIdxs, Prob, Post) :-
 measure_all(State, Outcome) :-
     length(State, Dim),
     N is round(log(Dim) / log(2)),
-    numlist(0, Dim-1, Idxs),
-    maplist([I, I-P]>>(nth0(I, State, A), complex_abs_sq(A, P)), Idxs, Probs),
+    Last is Dim - 1,
+    numlist(0, Last, Idxs),
+    maplist({State}/[I, I-P]>>(nth0(I, State, A), complex_abs_sq(A, P)), Idxs, Probs),
     random_outcome(Probs, Outcome).
 
 random_outcome(Probs, Outcome) :-
@@ -67,9 +74,10 @@ select_outcome([_|Rest], R, Acc, I) :-
 measurement_probabilities(State, QIdx, N, probs(P0, P1)) :-
     length(State, Dim),
     Dim =:= 2^N,
-    numlist(0, Dim-1, Idxs),
-    include([I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= 0), Idxs, Idxs0),
-    include([I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= 1), Idxs, Idxs1),
+    Last is Dim - 1,
+    numlist(0, Last, Idxs),
+    include({N,QIdx}/[I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= 0), Idxs, Idxs0),
+    include({N,QIdx}/[I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= 1), Idxs, Idxs1),
     sum_probs(State, Idxs0, P0),
     sum_probs(State, Idxs1, P1).
 
@@ -77,8 +85,9 @@ measurement_probabilities(State, QIdx, N, probs(P0, P1)) :-
 post_measurement_state(State, QIdx, N, Outcome, PostState) :-
     length(State, Dim),
     Dim =:= 2^N,
-    numlist(0, Dim-1, Idxs),
-    include([I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= Outcome), Idxs, KeepIdxs),
+    Last is Dim - 1,
+    numlist(0, Last, Idxs),
+    include({N,QIdx,Outcome}/[I]>>(B is (I >> (N-QIdx-1)) /\ 1, B =:= Outcome), Idxs, KeepIdxs),
     sum_probs(State, KeepIdxs, Prob),
     post_collapse(State, KeepIdxs, Prob, PostState).
 
